@@ -1,10 +1,49 @@
-﻿param(
-    $ReferenceObject  = (Import-Csv ".\CVE Scan Results on 09Feb22.csv"),
-    $DifferenceObject = (Import-Csv ".\CVE Scan Results on 15Mar22.csv"),
-    $ReportPath       = (Get-Location | Select-Object -ExpandProperty Path),
+﻿<#
+    .DESCRIPTION
+    Compare two Grype CVE CSV files and output reports.
+    Dan Komnick (high101bro)
+    11 April 2022
+
+    .SYNOPSIS
+    Use the Convert-GrypeJsonToCsv.ps1 to convert the Grype scans to a compiled CSV format. 
+    Then compare a new CSV scan results with an older one to see New and Remvoved CVEs.
+    You can also compile the results to an Excel format which will color code the severity levels for easy reference.
+    If outputted in combiled Excel format, you can also have individuals tabs created for each scan.
+
+    .INPUTS
+    CSV files that were output from Grype Scans. The expected format is one that was converted from a json file using a helper script.
+
+    .OUTPUTS
+    A CSV file that contains all the New CVEs detected since the ReferenceObject.
+    A CSV file that contains all the Removed CSVe no longer present in the DifferenceObject.
+    A CSV file that contains all the Removed CSVe no longer present in the DifferenceObject, but just the Critical and High severities.    
+    Option to output compiled CVE CSV results to an Excel document which color codes the severity levels.
+
+    .PARAMETER ReferenceObject DifferenceObject ReportPath IndividualTabs CompileToExcel
+
+    .EXAMPLE
+    ./Compare-CveCsv.ps1 -ReferenceObject ./OlderScanResults.csv -DifferenceObject ./NewerScanResults.csv    
+
+    .EXAMPLE
+    ./Compare-CveCsv.ps1 -ReferenceObject ./OlderScanResults.csv -DifferenceObject ./NewerScanResults.csv -CompileToExcel
+
+    .EXAMPLE
+    ./Compare-CveCsv.ps1 -ReferenceObject ./OlderScanResults.csv -DifferenceObject ./NewerScanResults.csv -CompileToExcel -IndividualTabs
+
+    .LINK
+    https://github.com/high101bro
+#>
+
+param(
+    $ReferenceObject,
+    $DifferenceObject,
+    $ReportPath = (Get-Location | Select-Object -ExpandProperty Path),
     [switch]$IndividualTabs,
     [switch]$CompileToExcel
 )
+
+$ReferenceObject  = Import-Csv $ReferenceObject
+$DifferenceObject = Import-Csv $DifferenceObject
 
 $ReferenceObjectCVEs = @{}
 foreach ( $CVE in $ReferenceObject ) {
@@ -42,9 +81,12 @@ foreach ( $CVE in $ReferenceObject ) {
 }
 
 
-$NewCVEs.GetEnumerator()     | Select-Object -ExpandProperty Value | Export-Csv .\New-CVEs-Between-Old-And-New.csv -NoTypeInformation
-$RemovedCVEs.GetEnumerator() | Select-Object -ExpandProperty Value | Export-Csv .\Removed-CVEs-Between-Old-And-New.csv -NoTypeInformation
-
+$NewCVEs.GetEnumerator()     | Select-Object -ExpandProperty Value | Export-Csv .\'New-CVEs-Between-Old-And-New-(All-Severities).csv' -NoTypeInformation
+$RemovedCVEs.GetEnumerator() | Select-Object -ExpandProperty Value | Export-Csv .\'Removed-CVEs-Between-Old-And-New.csv' -NoTypeInformation
+$NewCVEs.GetEnumerator() | 
+    Select-Object -ExpandProperty Value | 
+    Where-Object {$_.Severity -eq 'High' -or $_.Severity -eq 'Critical' } | 
+    Export-Csv -Path 'New-CVEs-Between-Old-And-New-(Just-High-Critical).csv' -NoTypeInformation -Force
 
 
 if ($CompileToExcel) {
@@ -148,7 +190,7 @@ if ($CompileToExcel) {
                     23 = light blue
                     24 = lilac purple
                 #>
-                <#
+                
                 if     ($LineContents[13] -match 'Critical') {
                     $excelapp.Cells.Item($CompiledRow,14).Interior.ColorIndex=9
                 }

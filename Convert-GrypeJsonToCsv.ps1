@@ -1,4 +1,38 @@
-﻿Param(
+﻿<#
+    .DESCRIPTION
+    Convert a Grype JSON scan results to a compiled CSV file.
+    Dan Komnick (high101bro)
+    11 April 2022
+
+    .SYNOPSIS
+    As of the writing of this script, Grype can output it's results as a JSON file. To increase usability by our technicians, this script
+    converts those JSON files into individual CSV files and can also compile them together as an Excel document. This script is intented
+    to be use with a companion follow-up script, Compare-CveCsv.ps1, which compares two versions of compiled CVE CSV files and produces
+    two additional files; one for new CVEs detected, and another for removed CVEs.
+    
+    .INPUTS
+    The script is to be ran from the same directory as the JSON files that were produced from Grype scans.
+
+    .OUTPUTS
+    One CSV file per JSON file scanned and parsed.
+    Option to output compiled CVE CSV results to an Excel document which color codes the severity levels.
+    
+    .PARAMETER IndividualTabs CompileToExcel
+
+    .EXAMPLE
+    ./Convert-GrypeJsonToCsv.ps1
+
+    .EXAMPLE
+    ./Convert-GrypeJsonToCsv.ps1 -OutPutExcelDoc
+
+    .EXAMPLE
+    ./Convert-GrypeJsonToCsv.ps1 -OutPutExcelDoc -IndividualTabs
+
+    .LINK
+    https://github.com/high101bro
+#>
+
+Param(
     [switch]$IndividualTabs,
     [switch]$OutputExcelDoc
 )
@@ -47,10 +81,10 @@ Foreach ($Report in $Reports) {
     $Data | Export-CSV "$ReportPath/$($Report.BaseName).csv" -NoTypeInformation -Force
 }
 
-
-
-
-
+Get-Content "$ReportPath/*.csv" | Add-Content "$ReportPath/_MergedCsvFiles.csv" -Force
+Import-Csv "$ReportPath/_MergedCsvFiles.csv"  |
+    Sort-Object CompiledEntryId, EntryId -Unique | 
+    Export-Csv "$ReportPath/_MergedCsvFiles_Removed_Duplicate_Headers.csv" -Force -NoTypeInformation
 
 
 if ($OutputExcelDoc) {
@@ -154,7 +188,7 @@ if ($OutputExcelDoc) {
                         23 = light blue
                         24 = lilac purple
                     #>
-                    <#
+                    
                     if     ($LineContents[13] -match 'Critical') {
                         $excelapp.Cells.Item($CompiledRow,14).Interior.ColorIndex=9
                     }
